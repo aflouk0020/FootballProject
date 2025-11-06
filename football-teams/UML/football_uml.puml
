@@ -1,0 +1,134 @@
+@startuml
+title Football Management System - UML Diagram
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam shadowing false
+skinparam backgroundColor #f9f9f9
+skinparam classFontColor #2E4053
+skinparam classBorderColor #5D6D7E
+skinparam classBackgroundColor #E8F6F3
+skinparam ArrowColor #2E86C1
+
+package "model" {
+    interface FootballEntity {
+        + int id()
+        + String name()
+        + default String entityInfo()
+        + static void printType(FootballEntity)
+    }
+
+    abstract class Person {
+        - name: String
+        - age: int
+        + getName(): String
+        + getAge(): int
+        + abstract void introduce()
+    }
+
+    class Team implements FootballEntity {
+        - id: Integer
+        - name: String
+        - city: String
+        - foundedYear: int
+        - players: List<Player>
+        + addPlayer(Player)
+        + addPlayers(Player... many)
+        + getPlayers(): List<Player>
+    }
+
+    class Player extends Person implements FootballEntity {
+        - id: Integer
+        - position: Position
+        - teamId: int
+        + getPosition(): Position
+        + getTeamId(): int
+        + introduce(): void
+    }
+
+    class Coach extends Person implements FootballEntity {
+        - teamId: int
+        + introduce(): void
+    }
+
+    enum Position {
+        GOALKEEPER
+        DEFENDER
+        MIDFIELDER
+        FORWARD
+        + description(): String
+        + shortCode(): String
+    }
+
+    ' using stereotype instead of record keyword for compatibility
+    class ContractRecord <<record>> {
+        playerName: String
+        annualSalary: double
+        years: int
+    }
+
+    class ImmutableSquadSnapshot {
+        - teamName: String
+        - playerNames: List<String>
+    }
+}
+
+package "dao" {
+    class DatabaseConnection {
+        + static Connection get()
+    }
+
+    class TeamDAO {
+        + int addTeamAndReturnId(Team)
+        + List<Team> getAllTeamsWithPlayers()
+    }
+
+    class PlayerDAO {
+        + boolean addPlayer(Player)
+        + List<Player> getAllPlayers()
+    }
+
+    class CoachDAO {
+        + boolean addCoach(Coach)
+        + List<Coach> getAllCoaches()
+    }
+}
+
+package "util" {
+    class InvalidAgeException
+    class DataAccessRuntimeException
+    class ValidationUtil {
+        + static List<Player> filter(List<Player>, Predicate<Player>)
+        + static boolean isAdult(Player)
+    }
+    class EntityPrinter {
+        + static String describe(FootballEntity)
+    }
+}
+
+package "app" {
+    class Main {
+        + static void main(String[] args)
+    }
+}
+
+' ==============================
+' Relationships
+' ==============================
+FootballEntity <|-- Team
+FootballEntity <|-- Player
+FootballEntity <|-- Coach
+Person <|-- Player
+Person <|-- Coach
+Team "1" o-- "*" Player
+Team "1" o-- "1" Coach
+TeamDAO --> Team
+PlayerDAO --> Player
+CoachDAO --> Coach
+ValidationUtil --> Player
+EntityPrinter --> FootballEntity
+Main --> TeamDAO
+Main --> PlayerDAO
+Main --> CoachDAO
+Main --> FootballEntity
+
+@enduml
