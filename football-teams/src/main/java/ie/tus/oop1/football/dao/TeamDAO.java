@@ -1,183 +1,114 @@
 package ie.tus.oop1.football.dao;
 
+import ie.tus.oop1.football.model.Player;
+import ie.tus.oop1.football.model.Position;
 import ie.tus.oop1.football.model.Team;
+import ie.tus.oop1.football.util.DataAccessRuntimeException;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class TeamDAO {
 
-    // helper method: check if team already exists (by name + city)
-    private boolean teamExists(String name, String city) {
-        String sql = "SELECT COUNT(*) FROM teams WHERE LOWER(name) = LOWER(?) AND LOWER(city) = LOWER(?)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setString(1, name);
-            stmt.setString(2, city);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt(1) > 0;  // true if any row matches
+    private boolean teamExists(Connection conn, String name) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM teams WHERE name = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) > 0;
             }
-
-        } catch (SQLException e) {
-            System.err.println("Error checking for duplicate team: " + e.getMessage());
         }
-        return false;
-    }
- // find team by name and city
-    public Team getTeamByNameAndCity(String name, String city) {
-        String sql = "SELECT * FROM teams WHERE LOWER(name) = LOWER(?) AND LOWER(city) = LOWER(?)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, name);
-            stmt.setString(2, city);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return new Team(
-                    rs.getInt("id"),
-                    rs.getString("name"),
-                    rs.getString("city"),
-                    rs.getInt("founded_year")
-                );
-            }
-        } catch (SQLException e) {
-            System.err.println(" Error fetching team by name and city: " + e.getMessage());
-        }
-        return null;
     }
 
- // return the inserted team’s ID (or existing one)
-    public int addTeamAndReturnId(Team team) {
-        if (teamExists(team.getName(), team.getCity())) {
-            Team existing = getTeamByNameAndCity(team.getName(), team.getCity());
-            if (existing != null) return existing.getId();
-            return -1;
-        }
-
-        String sql = "INSERT INTO teams (name, city, founded_year) VALUES (?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            stmt.setString(1, team.getName());
-            stmt.setString(2, team.getCity());
-            stmt.setInt(3, team.getFoundedYear());
-            stmt.executeUpdate();
-
-            ResultSet rs = stmt.getGeneratedKeys();
-            if (rs.next()) {
-                return rs.getInt(1); // newly inserted team ID
-            }
-        } catch (SQLException e) {
-            System.err.println(" Error adding team: " + e.getMessage());
-        }
-        return -1;
+    public int addTeamAndReturnId(Team t) {
+        return addTeamAndReturnId(t.getName(), t.getCity(), t.getFoundedYear());
     }
 
-
-    // read all teams
-    public List<Team> getAllTeams() {
-        List<Team> teams = new ArrayList<>();
-        String sql = "SELECT * FROM teams";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
-            while (rs.next()) {
-                Team team = new Team(
-                    rs.getInt("id"),
-                    rs.getString("name"),
-                    rs.getString("city"),
-                    rs.getInt("founded_year")
-                );
-                teams.add(team);
+    public int addTeamAndReturnId(String name, String city, int foundedYear) {
+        final String sqlInsert = "INSERT INTO teams(name, city, founded_year) VALUES (?, ?, ?)";
+        try (Connection conn = DatabaseConnection.get()) {
+            if (teamExists(conn, name)) {
+                System.out.println("ℹ️ Team already exists: " + name);
+                try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM teams WHERE name = ?")) {
+                    ps.setString(1, name);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) return rs.getInt("id");
+                    }
+                }
+                return -1;
             }
 
+            try (PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, name);
+                ps.setString(2, city);
+                ps.setInt(3, foundedYear);
+                ps.executeUpdate();
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int id = rs.getInt(1);
+                        System.out.println("✅ Team added: " + name);
+                        return id;
+                    }
+                    throw new SQLException("No generated key returned for team");
+                }
+            }
         } catch (SQLException e) {
-            System.err.println(" Error reading teams: " + e.getMessage());
+            throw new DataAccessRuntimeException("Failed to insert or fetch team", e);
         }
-        return teams;
     }
 
- //  read all teams with their players (joined data)
     public List<Team> getAllTeamsWithPlayers() {
-        PlayerDAO playerDAO = new PlayerDAO();  
-        List<Team> teams = getAllTeams();      
+        List<Team> teams = getAllTeams();
+        final String sql = """
+                SELECT p.id, p.name, p.position, p.age, p.team_id
+                FROM players p
+                WHERE p.team_id = ?
+                ORDER BY p.name
+                """;
+        try (Connection conn = DatabaseConnection.get();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-        // for each team, load its player list
-        for (Team team : teams) {
-            team.setPlayers(playerDAO.getPlayersByTeamId(team.getId()));
-        }
-
-        return teams;
-    }
-
-    
-    // read single team by ID
-    public Team getTeamById(int id) {
-        String sql = "SELECT * FROM teams WHERE id = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setInt(1, id);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return new Team(
-                    rs.getInt("id"),
-                    rs.getString("name"),
-                    rs.getString("city"),
-                    rs.getInt("founded_year")
-                );
+            for (Team t : teams) {
+                // fresh copy per query (avoid repeated players)
+                List<Player> newPlayers = new ArrayList<>();
+                ps.setInt(1, t.id());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        var player = new Player(
+                                rs.getInt("id"),
+                                rs.getString("name"),
+                                Position.valueOf(rs.getString("position").toUpperCase()),
+                                rs.getInt("age"),
+                                rs.getInt("team_id"));
+                        newPlayers.add(player);
+                    }
+                }
+                t.addPlayers(newPlayers.toArray(new Player[0]));
             }
-        } catch (SQLException e) {
-            System.err.println("Error retrieving team: " + e.getMessage());
-        }
-        return null;
-    }
-
-    // update existing team
-    public void updateTeam(Team team) {
-        String sql = "UPDATE teams SET name = ?, city = ?, founded_year = ? WHERE id = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, team.getName());
-            stmt.setString(2, team.getCity());
-            stmt.setInt(3, team.getFoundedYear());
-            stmt.setInt(4, team.getId());
-            int rows = stmt.executeUpdate();
-
-            if (rows > 0)
-                System.out.println(" Team updated successfully!");
-            else
-                System.out.println("No team found with ID " + team.getId());
+            return teams;
 
         } catch (SQLException e) {
-            System.err.println("Error updating team: " + e.getMessage());
+            throw new DataAccessRuntimeException("Failed to fetch teams with players", e);
         }
     }
 
-    // delete team
-    public void deleteTeam(int id) {
-        String sql = "DELETE FROM teams WHERE id = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, id);
-            int rows = stmt.executeUpdate();
-
-            if (rows > 0)
-                System.out.println("Team deleted successfully!");
-            else
-                System.out.println("No team found with ID " + id);
-
+    public List<Team> getAllTeams() {
+        final String sql = "SELECT id, name, city, founded_year FROM teams ORDER BY name";
+        List<Team> result = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.get();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.add(new Team(rs.getInt("id"),
+                        rs.getString("name"),
+                        rs.getString("city"),
+                        rs.getInt("founded_year")));
+            }
+            return result;
         } catch (SQLException e) {
-            System.err.println("Error deleting team: " + e.getMessage());
+            throw new DataAccessRuntimeException("Failed to fetch teams", e);
         }
     }
 }
