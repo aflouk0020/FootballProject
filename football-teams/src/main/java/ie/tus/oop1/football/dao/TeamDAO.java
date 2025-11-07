@@ -111,4 +111,14 @@ public class TeamDAO {
             throw new DataAccessRuntimeException("Failed to fetch teams", e);
         }
     }
+    
+    public void deleteTeamByName(String name) {
+        try (Connection c = DatabaseConnection.get();
+             var ps = c.prepareStatement("DELETE FROM teams WHERE name=?")) {
+            ps.setString(1, name);
+            ps.executeUpdate();
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+    
+    
 }

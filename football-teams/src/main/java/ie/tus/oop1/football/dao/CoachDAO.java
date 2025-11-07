@@ -56,4 +56,12 @@ public class CoachDAO {
             throw new DataAccessRuntimeException("Failed to fetch coaches", e);
         }
     }
+    
+    public void deleteCoachByName(String name) {
+        try (Connection c = DatabaseConnection.get();
+             var ps = c.prepareStatement("DELETE FROM coaches WHERE name=?")) {
+            ps.setString(1, name);
+            ps.executeUpdate();
+        } catch (Exception e) { e.printStackTrace(); }
+    }
 }
