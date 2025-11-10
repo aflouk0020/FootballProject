@@ -11,64 +11,49 @@ import java.util.List;
 public class PlayerDAO {
 
     private boolean playerExists(Connection conn, String name, int teamId) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM players WHERE name = ? AND team_id = ?";
+        String sql = "SELECT COUNT(*) FROM players WHERE name=? AND team_id=?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, name);
-            ps.setInt(2, teamId);
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getInt(1) > 0;
-            }
+            ps.setString(1, name); ps.setInt(2, teamId);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1) > 0; }
         }
     }
 
     public boolean addPlayer(Player p) {
-        final String sqlInsert = "INSERT INTO players(name, position, age, team_id) VALUES(?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.get()) {
-            if (playerExists(conn, p.getName(), p.getTeamId())) {
-                System.out.println("ℹ️ Player already exists: " + p.getName());
-                return false;
-            }
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setString(1, p.getName());
-                ps.setString(2, p.getPosition().name().toUpperCase());
-                ps.setInt(3, p.getAge());
-                ps.setInt(4, p.getTeamId());
-                ps.executeUpdate();
-                System.out.println("✅ Player added: " + p.getName());
+        final String sql = "INSERT INTO players(name, position, age, team_id) VALUES(?, ?, ?, ?)";
+        try (Connection c = DatabaseConnection.get()) {
+            if (playerExists(c, p.getName(), p.getTeamId())) return false;
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setString(1, p.getName()); ps.setString(2, p.getPosition().name());
+                ps.setInt(3, p.getAge()); ps.setInt(4, p.getTeamId()); ps.executeUpdate();
             }
             return true;
-        } catch (SQLException e) {
-            throw new DataAccessRuntimeException("Failed to insert or check player", e);
-        }
+        } catch (SQLException e) { throw new DataAccessRuntimeException("Insert player failed", e); }
+    }
+
+    public void updatePlayer(Player p) {
+        final String sql = "UPDATE players SET name=?, position=?, age=? WHERE id=?";
+        try (Connection c = DatabaseConnection.get(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, p.getName()); ps.setString(2, p.getPosition().name());
+            ps.setInt(3, p.getAge()); ps.setInt(4, p.getIdBoxed()); ps.executeUpdate();
+        } catch (SQLException e) { throw new DataAccessRuntimeException("Update player failed", e); }
     }
 
     public List<Player> getAllPlayers() {
         final String sql = "SELECT id, name, position, age, team_id FROM players ORDER BY name";
-        List<Player> result = new ArrayList<>();
-        try (Connection conn = DatabaseConnection.get();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                result.add(new Player(
-                        rs.getInt("id"),
-                        rs.getString("name"),
+        List<Player> out = new ArrayList<>();
+        try (Connection c = DatabaseConnection.get(); PreparedStatement ps = c.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next())
+                out.add(new Player(rs.getInt("id"), rs.getString("name"),
                         Position.valueOf(rs.getString("position").toUpperCase()),
-                        rs.getInt("age"),
-                        rs.getInt("team_id")));
-            }
-            return result;
-        } catch (SQLException e) {
-            throw new DataAccessRuntimeException("Failed to fetch players", e);
-        }
+                        rs.getInt("age"), rs.getInt("team_id")));
+            return out;
+        } catch (SQLException e) { throw new DataAccessRuntimeException("Fetch players failed", e); }
     }
-    
+
     public void deletePlayerByName(String name) {
-        try (Connection c = DatabaseConnection.get();
-             var ps = c.prepareStatement("DELETE FROM players WHERE name=?")) {
-            ps.setString(1, name);
-            ps.executeUpdate();
-        } catch (Exception e) { e.printStackTrace(); }
+        try (Connection c = DatabaseConnection.get(); PreparedStatement ps = c.prepareStatement("DELETE FROM players WHERE name=?")) {
+            ps.setString(1, name); ps.executeUpdate();
+        } catch (SQLException e) { throw new DataAccessRuntimeException("Delete player failed", e); }
     }
 }
+
