@@ -1,18 +1,27 @@
 
+
+
+
+
+
 package ie.tus.oop1.football.app;
 
-import ie.tus.oop1.football.dao.*;
-import ie.tus.oop1.football.model.*;
-
-import javax.swing.*;
-import javax.swing.Timer;
-import javax.swing.border.EmptyBorder;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
-
+import ie.tus.oop1.football.dao.CoachDAO;
+import ie.tus.oop1.football.dao.DatabaseConnection;
+import ie.tus.oop1.football.dao.PlayerDAO;
+import ie.tus.oop1.football.dao.TeamDAO;
+import ie.tus.oop1.football.model.Coach;
+import ie.tus.oop1.football.model.Player;
+import ie.tus.oop1.football.model.Position;
+import ie.tus.oop1.football.model.Team;
 import e.tus.oop1.football.service.DatabaseMigrator;
 
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.TableModelEvent;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.Connection;
 import java.util.*;
@@ -20,25 +29,20 @@ import java.util.List;
 
 public class FootballGUI extends JFrame {
 
-    // === DAOs ===
     private final TeamDAO teamDAO = new TeamDAO();
     private final PlayerDAO playerDAO = new PlayerDAO();
     private final CoachDAO coachDAO = new CoachDAO();
 
-    // === UI Components ===
     private JLabel lblStatus, lblStats;
     private JTable tblTeams, tblPlayers, tblCoaches;
     private DefaultTableModel teamModel, playerModel, coachModel;
-    private JTextField txtSearchTeams;      // global team search
-    private JTextField txtSearchPlayers;    // right-panel player search (per team)
+    private JTextField txtSearchTeams, txtSearchPlayers;
     private JTextArea txtLog;
 
-    // === Data Caches ===
     private List<Team> teams = new ArrayList<>();
     private Map<Integer, List<Player>> playersByTeam = new HashMap<>();
     private List<Coach> coaches = new ArrayList<>();
 
-    // === Constructor ===
     public FootballGUI() {
         setTitle("⚽ Football Management System");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -54,7 +58,6 @@ public class FootballGUI extends JFrame {
         loadAllDataAsync();
     }
 
-    // ---------------- TOP BAR ----------------
     private JPanel buildTopBar() {
         JPanel top = new JPanel(new BorderLayout(10, 0));
         top.setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -64,12 +67,10 @@ public class FootballGUI extends JFrame {
         lblStats = new JLabel("");
 
         JButton btnRefresh = new JButton("Refresh");
-        btnRefresh.setFont(btnRefresh.getFont().deriveFont(Font.BOLD, 13f));
-        btnRefresh.setForeground(new Color(30, 90, 180));
         btnRefresh.addActionListener(e -> loadAllDataAsync());
 
         txtSearchTeams = new JTextField(22);
-        txtSearchTeams.putClientProperty("JTextField.placeholderText", "Search teams by name/city…");
+        txtSearchTeams.putClientProperty("JTextField.placeholderText", "Search teams…");
         txtSearchTeams.addActionListener(e -> filterTeams());
 
         JPanel right = new JPanel();
@@ -82,7 +83,6 @@ public class FootballGUI extends JFrame {
         return top;
     }
 
-    // ---------------- TABS ----------------
     private JTabbedPane buildTabs() {
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Teams / Players", buildTeamsPlayersPanel());
@@ -90,43 +90,49 @@ public class FootballGUI extends JFrame {
         return tabs;
     }
 
-    // ---------------- TEAMS / PLAYERS PANEL ----------------
     private JPanel buildTeamsPlayersPanel() {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         split.setResizeWeight(0.45);
 
         // === Teams ===
-        teamModel = new DefaultTableModel(new Object[]{"ID", "Name", "City", "Founded", "Edit", "Delete"}, 0) {
-            public boolean isCellEditable(int r, int c) { return c >= 4; }
+        teamModel = new DefaultTableModel(new Object[]{"ID", "Name", "City", "Founded", "Delete"}, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return (c >= 1 && c <= 3) || c == 4; }
+            @Override public Class<?> getColumnClass(int c) { return (c == 0 || c == 3) ? Integer.class : Object.class; }
         };
         tblTeams = new JTable(teamModel);
+        tblTeams.setFillsViewportHeight(true);
+        tblTeams.putClientProperty("terminateEditOnFocusLost", true);
         tblTeams.getSelectionModel().addListSelectionListener(this::onTeamSelected);
-        addButtonColumns(tblTeams, new int[]{4, 5}, new String[]{"Edit", "Delete"}, new Color[]{new Color(0,128,0), Color.RED.darker()},
-                (row, col) -> { if (col == 4) editTeamAtRow(row); else deleteTeamAtRow(row); });
-
-        JPanel leftNorth = new JPanel(new BorderLayout(5, 5));
-        leftNorth.add(new JLabel("Teams", SwingConstants.LEFT), BorderLayout.WEST);
+        addDeleteButton(tblTeams, 4, Color.RED.darker(), this::deleteTeamAtRow);
+        leftAlignNumberColumns(tblTeams, new int[]{0, 3});
+        teamModel.addTableModelListener(this::inlineTeamEdit);
 
         JPanel left = new JPanel(new BorderLayout(5, 5));
         left.setBorder(new EmptyBorder(6, 8, 6, 8));
-        left.add(leftNorth, BorderLayout.NORTH);
+        left.add(new JLabel("Teams"), BorderLayout.NORTH);
         left.add(new JScrollPane(tblTeams), BorderLayout.CENTER);
         left.add(buildAddTeamPanel(), BorderLayout.SOUTH);
 
         // === Players ===
-        playerModel = new DefaultTableModel(new Object[]{"ID", "Name", "Position", "Age", "TeamId", "Edit", "Delete"}, 0) {
-            public boolean isCellEditable(int r, int c) { return c >= 5; }
+        playerModel = new DefaultTableModel(new Object[]{"ID", "Name", "Position", "Age", "TeamId", "Delete"}, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return (c >= 1 && c <= 3) || c == 5; }
+            @Override public Class<?> getColumnClass(int c) {
+                return switch (c) { case 0, 3, 4 -> Integer.class; case 2 -> Position.class; default -> Object.class; };
+            }
         };
         tblPlayers = new JTable(playerModel);
-        addButtonColumns(tblPlayers, new int[]{5, 6}, new String[]{"Edit", "Delete"}, new Color[]{new Color(0,128,0), Color.RED.darker()},
-                (row, col) -> { if (col == 5) editPlayerAtRow(row); else deletePlayerAtRow(row); });
+        tblPlayers.setFillsViewportHeight(true);
+        tblPlayers.putClientProperty("terminateEditOnFocusLost", true);
+        addDeleteButton(tblPlayers, 5, Color.RED.darker(), this::deletePlayerAtRow);
+        leftAlignNumberColumns(tblPlayers, new int[]{0, 3, 4});
+        installPlayerPositionEditor();
+        playerModel.addTableModelListener(this::inlinePlayerEdit);
 
         JPanel rightNorth = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        rightNorth.add(new JLabel("Players (by team)"));
+        rightNorth.add(new JLabel("Players"));
         txtSearchPlayers = new JTextField(18);
-        txtSearchPlayers.putClientProperty("JTextField.placeholderText", "Search players in this team…");
+        txtSearchPlayers.putClientProperty("JTextField.placeholderText", "Search players…");
         txtSearchPlayers.addActionListener(e -> filterPlayersForSelectedTeam());
-        rightNorth.add(Box.createHorizontalStrut(15));
         rightNorth.add(txtSearchPlayers);
 
         JPanel right = new JPanel(new BorderLayout(5, 5));
@@ -137,33 +143,58 @@ public class FootballGUI extends JFrame {
 
         split.setLeftComponent(left);
         split.setRightComponent(right);
-
         JPanel p = new JPanel(new BorderLayout());
         p.add(split, BorderLayout.CENTER);
         return p;
     }
 
-    // ---------------- COACHES PANEL ----------------
     private JPanel buildCoachesPanel() {
-        coachModel = new DefaultTableModel(new Object[]{"ID", "Name", "Age", "TeamId", "Edit", "Delete"}, 0) {
-            public boolean isCellEditable(int r, int c) { return c >= 4; }
+        coachModel = new DefaultTableModel(new Object[]{"ID", "Name", "Age", "TeamId", "Delete"}, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return (c == 1 || c == 2) || c == 4; }
+            @Override public Class<?> getColumnClass(int c) { return (c == 0 || c == 2 || c == 3) ? Integer.class : Object.class; }
         };
         tblCoaches = new JTable(coachModel);
-        addButtonColumns(tblCoaches, new int[]{4, 5}, new String[]{"Edit", "Delete"}, new Color[]{new Color(0,128,0), Color.RED.darker()},
-                (row, col) -> { if (col == 4) editCoachAtRow(row); else deleteCoachAtRow(row); });
+        tblCoaches.setFillsViewportHeight(true);
+        tblCoaches.putClientProperty("terminateEditOnFocusLost", true);
+        addDeleteButton(tblCoaches, 4, Color.RED.darker(), this::deleteCoachAtRow);
+        leftAlignNumberColumns(tblCoaches, new int[]{0, 2, 3});
+        coachModel.addTableModelListener(this::inlineCoachEdit);
 
         JPanel p = new JPanel(new BorderLayout(5, 5));
         p.setBorder(new EmptyBorder(6, 8, 6, 8));
         p.add(new JScrollPane(tblCoaches), BorderLayout.CENTER);
-
         JButton btnAddCoach = new JButton("Add Coach");
         btnAddCoach.addActionListener(e -> addCoachDialog());
         p.add(btnAddCoach, BorderLayout.SOUTH);
-
         return p;
     }
 
-    // ---------------- ADD PANELS ----------------
+    // ---------------- INLINE EDITS ----------------
+    private void inlineTeamEdit(TableModelEvent e) {
+        if (e.getType() != TableModelEvent.UPDATE) return;
+        int row = e.getFirstRow();
+        try {
+            int id = (int) teamModel.getValueAt(row, 0);
+            String name = (String) teamModel.getValueAt(row, 1);
+            String city = (String) teamModel.getValueAt(row, 2);
+            int year = parseYear(String.valueOf(teamModel.getValueAt(row, 3)));
+            teamDAO.updateTeam(id, name, city, year);
+        } catch (Exception ex) { showError("Error updating team."); }
+    }
+
+    private void inlinePlayerEdit(TableModelEvent e) {
+        if (e.getType() != TableModelEvent.UPDATE) return;
+        int row = e.getFirstRow();
+        try {
+            Integer id = (Integer) playerModel.getValueAt(row, 0);
+            String name = String.valueOf(playerModel.getValueAt(row, 1));
+            Position pos = (Position) playerModel.getValueAt(row, 2);
+            int age = parseAge(String.valueOf(playerModel.getValueAt(row, 3)));
+            int teamId = (Integer) playerModel.getValueAt(row, 4);
+            playerDAO.updatePlayer(new Player(id, name, pos, age, teamId));
+        } catch (Exception ex) { showError("Error updating player."); }
+    }
+ // ---------------- ADD TEAM PANEL ----------------
     private JPanel buildAddTeamPanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JTextField txtName = new JTextField(10);
@@ -173,42 +204,41 @@ public class FootballGUI extends JFrame {
 
         btnAdd.addActionListener(e -> {
             try {
-                // validation
                 String name = txtName.getText().trim();
                 String city = txtCity.getText().trim();
                 int year = parseYear(txtYear.getText());
-
                 if (name.isEmpty() || city.isEmpty()) {
                     showError("Team name and city are required.");
                     return;
                 }
                 int teamId = teamDAO.addTeamAndReturnId(new Team(name, city, year));
-                if (teamId <= 0) { showInfo("ℹ️ Team already exists."); loadAllDataAsync(); return; }
-
-                // Immediately ask for a coach (mandatory)
-                boolean coachAdded = promptCoachForTeam(teamId, name);
-                if (!coachAdded) {
-                    showInfo("⚠️ Coach creation cancelled. The team will be removed.");
-                    teamDAO.deleteTeamByIdCascade(teamId);
-                } else {
-                    showInfo("✅ Team and coach added.");
+                if (teamId <= 0) {
+                    showError("Team already exists.");
+                    loadAllDataAsync();
+                    return;
                 }
+                showInfo("✅ Team added.");
                 loadAllDataAsync();
-
-            } catch (NumberFormatException nfe) {
-                showError("Founded year must be between 1850 and " + java.time.Year.now().getValue() + ".");
             } catch (Exception ex) {
                 showError("Error adding team: " + ex.getMessage());
             }
         });
 
+        
         p.add(new JLabel("Name:")); p.add(txtName);
         p.add(new JLabel("City:")); p.add(txtCity);
         p.add(new JLabel("Year:")); p.add(txtYear);
         p.add(btnAdd);
         return p;
     }
+ // ---------------- MESSAGE HELPERS ----------------
+    private void showInfo(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Info", JOptionPane.INFORMATION_MESSAGE);
+    }
 
+
+
+    // ---------------- ADD PLAYER PANEL ----------------
     private JPanel buildAddPlayerPanel() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JTextField txtName = new JTextField(10);
@@ -218,175 +248,185 @@ public class FootballGUI extends JFrame {
 
         btnAdd.addActionListener(e -> {
             int row = tblTeams.getSelectedRow();
-            if (row < 0) { showInfo("Select a team first."); return; }
+            if (row < 0) { showError("Select a team first."); return; }
             int teamId = (int) teamModel.getValueAt(row, 0);
-
             try {
                 String name = txtName.getText().trim();
                 int age = parseAge(txtAge.getText());
                 Position pos = (Position) cmbPos.getSelectedItem();
-
-                if (name.isEmpty()) { showError("Player name is required."); return; }
-
-                boolean ok = playerDAO.addPlayer(new Player(name, pos, age, teamId));
-                showInfo(ok ? "✅ Player added." : "ℹ️ Player already exists.");
+                if (name.isEmpty()) { showError("Player name required."); return; }
+                playerDAO.addPlayer(new Player(name, pos, age, teamId));
+                showInfo("✅ Player added.");
                 refreshPlayersTable(teamId);
                 loadAllDataAsync();
-            } catch (NumberFormatException nfe) {
-                showError("Age must be between 15 and 60.");
             } catch (Exception ex) {
-                showError("Error: " + ex.getMessage());
+                showError("Error adding player: " + ex.getMessage());
             }
         });
 
         p.add(new JLabel("Name:")); p.add(txtName);
-        p.add(new JLabel("Pos:"));  p.add(cmbPos);
-        p.add(new JLabel("Age:"));  p.add(txtAge);
+        p.add(new JLabel("Position:")); p.add(cmbPos);
+        p.add(new JLabel("Age:")); p.add(txtAge);
         p.add(btnAdd);
         return p;
     }
 
-    private boolean promptCoachForTeam(int teamId, String teamName) {
-        JTextField txtCoach = new JTextField();
-        JTextField txtAge = new JTextField();
-        Object[] fields = {"New coach for " + teamName + ":", "Name:", txtCoach, "Age:", txtAge};
-
-        int res = JOptionPane.showConfirmDialog(this, fields, "Add Coach (Required)", JOptionPane.OK_CANCEL_OPTION);
-        if (res != JOptionPane.OK_OPTION) return false;
-
-        try {
-            String name = txtCoach.getText().trim();
-            int age = parseAge(txtAge.getText());
-            if (name.isEmpty()) { showError("Coach name is required."); return false; }
-            boolean ok = coachDAO.addCoach(new Coach(name, age, teamId));
-            if (!ok) showInfo("ℹ️ Coach already exists.");
-            return true;
-        } catch (NumberFormatException nfe) {
-            showError("Age must be between 18 and 75.");
-            return false;
-        } catch (Exception ex) {
-            showError("Error creating coach: " + ex.getMessage());
-            return false;
-        }
-    }
-
+    // ---------------- ADD COACH DIALOG ----------------
     private void addCoachDialog() {
-        if (teams.isEmpty()) { showInfo("Add a team first."); return; }
+        if (teams.isEmpty()) { showError("Add a team first."); return; }
+
         JTextField txtName = new JTextField();
         JTextField txtAge = new JTextField();
         JComboBox<Team> cmbTeam = new JComboBox<>(teams.toArray(new Team[0]));
         Object[] fields = {"Name:", txtName, "Age:", txtAge, "Team:", cmbTeam};
 
-        int res = JOptionPane.showConfirmDialog(this, fields, "Add Coach", JOptionPane.OK_CANCEL_OPTION);
-        if (res == JOptionPane.OK_OPTION) {
+        if (JOptionPane.showConfirmDialog(this, fields, "Add Coach", JOptionPane.OK_CANCEL_OPTION)
+                == JOptionPane.OK_OPTION) {
             try {
-                Team team = (Team) cmbTeam.getSelectedItem();
                 String name = txtName.getText().trim();
                 int age = parseAge(txtAge.getText());
-                if (name.isEmpty()) { showError("Coach name is required."); return; }
-                boolean ok = coachDAO.addCoach(new Coach(name, age, team.id()));
-                showInfo(ok ? "✅ Coach added." : "ℹ️ Coach exists.");
+                Team t = (Team) cmbTeam.getSelectedItem();
+                coachDAO.addCoach(new Coach(name, age, t.id()));
+                showInfo("✅ Coach added.");
                 loadAllDataAsync();
-            } catch (NumberFormatException nfe) {
-                showError("Age must be between 18 and 75.");
             } catch (Exception ex) {
-                showError("Error: " + ex.getMessage());
+                showError("Error adding coach: " + ex.getMessage());
             }
         }
     }
 
-    // ---------------- LOG AREA ----------------
-    private JScrollPane buildLogArea() {
-        txtLog = new JTextArea(4, 20);
-        txtLog.setEditable(false);
-        txtLog.setLineWrap(true);
-        JScrollPane sp = new JScrollPane(txtLog);
-        sp.setBorder(new EmptyBorder(0, 8, 8, 8));
-        return sp;
+
+    private void inlineCoachEdit(TableModelEvent e) {
+        if (e.getType() != TableModelEvent.UPDATE) return;
+        int row = e.getFirstRow();
+        try {
+            Integer id = (Integer) coachModel.getValueAt(row, 0);
+            String name = String.valueOf(coachModel.getValueAt(row, 1));
+            int age = parseAge(String.valueOf(coachModel.getValueAt(row, 2)));
+            int teamId = (Integer) coachModel.getValueAt(row, 3);
+            coachDAO.updateCoach(new Coach(id, name, age, teamId));
+        } catch (Exception ex) { showError("Error updating coach."); }
     }
 
-    // ---------------- EVENTS ----------------
-    private void onTeamSelected(ListSelectionEvent e) {
-        if (e.getValueIsAdjusting()) return;
-        int row = tblTeams.getSelectedRow();
-        if (row < 0) { playerModel.setRowCount(0); return; }
-        int teamId = (int) teamModel.getValueAt(row, 0);
-        refreshPlayersTable(teamId);
-    }
-
-    // ---------------- DATA ----------------
-    private void loadAllDataAsync() {
-        new SwingWorker<Void, Void>() {
-            protected Void doInBackground() {
-                teams = teamDAO.getAllTeams();
-                playersByTeam.clear();
-                for (Team t : teamDAO.getAllTeamsWithPlayers())
-                    playersByTeam.put(t.id(), t.getPlayers());
-                coaches = coachDAO.getAllCoaches();
-                return null;
+    // ---------------- DELETE BUTTONS ----------------
+    private void addDeleteButton(JTable table, int col, Color color, java.util.function.IntConsumer action) {
+        table.getColumnModel().getColumn(col).setCellRenderer((t, v, s, f, r, c) -> {
+            JButton btn = new JButton("Delete");
+            btn.setForeground(color);
+            btn.setFont(btn.getFont().deriveFont(Font.BOLD, 12f));
+            return btn;
+        });
+        table.getColumnModel().getColumn(col).setCellEditor(new DefaultCellEditor(new JCheckBox()) {
+            private final JButton button = new JButton("Delete");
+            private int editingRow = -1;
+            {
+                button.setForeground(color);
+                button.setFont(button.getFont().deriveFont(Font.BOLD, 12f));
+                button.addActionListener(e -> {
+                    fireEditingStopped();
+                    if (editingRow >= 0) action.accept(editingRow);
+                });
             }
-            protected void done() {
-                populateTables();
-                lblStats.setText(makeStatsLine());
+            @Override public Component getTableCellEditorComponent(JTable t, Object v, boolean s, int r, int c) {
+                editingRow = r; return button;
             }
-        }.execute();
+            @Override public Object getCellEditorValue() { return null; }
+        });
+        table.getColumnModel().getColumn(col).setMaxWidth(85);
     }
 
-    private void populateTables() {
-        teamModel.setRowCount(0);
-        for (Team t : teams)
-            teamModel.addRow(new Object[]{t.id(), t.getName(), t.getCity(), t.getFoundedYear(), "Edit", "Delete"});
-
-        coachModel.setRowCount(0);
-        for (Coach c : coaches)
-            coachModel.addRow(new Object[]{c.id(), c.getName(), c.getAge(), c.id(), "Edit", "Delete"});
-
-        // refresh right table if a team is selected
-        int row = tblTeams.getSelectedRow();
-        if (row >= 0) refreshPlayersTable((int) teamModel.getValueAt(row, 0));
+    private void installPlayerPositionEditor() {
+        JComboBox<Position> combo = new JComboBox<>(Position.values());
+        tblPlayers.getColumnModel().getColumn(2).setCellEditor(new DefaultCellEditor(combo));
     }
 
-    private void refreshPlayersTable(int teamId) {
-        playerModel.setRowCount(0);
-        String q = txtSearchPlayers == null ? "" : txtSearchPlayers.getText().trim().toLowerCase();
-        List<Player> players = playersByTeam.getOrDefault(teamId, List.of());
-        for (Player p : players) {
-            if (q.isEmpty() || p.getName().toLowerCase().contains(q) || p.getPosition().name().toLowerCase().contains(q)) {
-                playerModel.addRow(new Object[]{p.getIdBoxed(), p.getName(), p.getPosition(), p.getAge(), p.getTeamId(), "Edit", "Delete"});
-            }
-        }
+    private void leftAlignNumberColumns(JTable table, int[] cols) {
+        DefaultTableCellRenderer left = new DefaultTableCellRenderer();
+        left.setHorizontalAlignment(SwingConstants.LEFT);
+        for (int col : cols)
+            table.getColumnModel().getColumn(col).setCellRenderer(left);
     }
 
-    private String makeStatsLine() {
-        int t = teams.size();
-        int p = playersByTeam.values().stream().mapToInt(List::size).sum();
-        int c = coaches.size();
-        return String.format("Teams: %d | Players: %d | Coaches: %d", t, p, c);
+    // ---------------- DELETE LOGIC ----------------
+    private void deleteTeamAtRow(int row) {
+        if (row < 0 || row >= teamModel.getRowCount()) return;
+        int id = (int) teamModel.getValueAt(row, 0);
+        if (!confirm("Delete team and all related data?")) return;
+        teamDAO.deleteTeamByIdCascade(id);
+        loadAllDataAsync();
     }
 
+    private void deletePlayerAtRow(int row) {
+        if (row < 0 || row >= playerModel.getRowCount()) return;
+        String name = String.valueOf(playerModel.getValueAt(row, 1));
+        if (!confirm("Delete player '" + name + "'?")) return;
+        playerDAO.deletePlayerByName(name);
+        loadAllDataAsync();
+    }
+
+    private void deleteCoachAtRow(int row) {
+        if (row < 0 || row >= coachModel.getRowCount()) return;
+        String name = String.valueOf(coachModel.getValueAt(row, 1));
+        if (!confirm("Delete coach '" + name + "'?")) return;
+        coachDAO.deleteCoachByName(name);
+        loadAllDataAsync();
+    }
+
+    // ---------------- OTHER UTILITY ----------------
     private void updateDbStatus() {
         new SwingWorker<Boolean, Void>() {
-            protected Boolean doInBackground() {
-                try (Connection c = DatabaseConnection.get()) { return c != null && !c.isClosed(); }
-                catch (Exception e) { return false; }
+            @Override protected Boolean doInBackground() {
+                try (Connection c = DatabaseConnection.get()) {
+                    return c != null && !c.isClosed();
+                } catch (Exception e) { return false; }
             }
-            protected void done() {
+            @Override protected void done() {
                 try {
                     boolean ok = get();
                     lblStatus.setText(ok ? "DB: Connected ✅" : "DB: Not connected ❌");
-                    lblStatus.setForeground(ok ? new Color(0, 128, 0) : Color.RED);
+                    lblStatus.setForeground(ok ? new Color(0,128,0) : Color.RED);
                 } catch (Exception ignored) {}
             }
         }.execute();
     }
 
-    // ---------------- SEARCH ----------------
+    private JScrollPane buildLogArea() {
+        txtLog = new JTextArea(4, 20);
+        txtLog.setEditable(false);
+        txtLog.setLineWrap(true);
+        JScrollPane sp = new JScrollPane(txtLog);
+        sp.setBorder(new EmptyBorder(0,8,8,8));
+        return sp;
+    }
+
+    private boolean confirm(String msg) {
+        return JOptionPane.showConfirmDialog(this, msg, "Confirm", JOptionPane.YES_NO_OPTION)
+                == JOptionPane.YES_OPTION;
+    }
+
+    private int parseAge(String s) {
+        int age = Integer.parseInt(s.trim());
+        if (age < 15 || age > 75) throw new NumberFormatException();
+        return age;
+    }
+
+    private int parseYear(String s) {
+        int y = Integer.parseInt(s.trim());
+        int max = java.time.Year.now().getValue();
+        if (y < 1850 || y > max) throw new NumberFormatException();
+        return y;
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
     private void filterTeams() {
         String q = txtSearchTeams.getText().trim().toLowerCase();
         teamModel.setRowCount(0);
         for (Team t : teams)
             if (t.getName().toLowerCase().contains(q) || t.getCity().toLowerCase().contains(q))
-                teamModel.addRow(new Object[]{t.id(), t.getName(), t.getCity(), t.getFoundedYear(), "Edit", "Delete"});
+                teamModel.addRow(new Object[]{t.id(), t.getName(), t.getCity(), t.getFoundedYear(), "Delete"});
     }
 
     private void filterPlayersForSelectedTeam() {
@@ -396,196 +436,61 @@ public class FootballGUI extends JFrame {
         refreshPlayersTable(teamId);
     }
 
-    // ---------------- VALIDATION HELPERS ----------------
-    private int parseAge(String s) {
-        int age = Integer.parseInt(s.trim());
-        if (age < 15 || age > 75) throw new NumberFormatException("bad age");
-        return age;
-    }
-    private int parseYear(String s) {
-        int y = Integer.parseInt(s.trim());
-        int max = java.time.Year.now().getValue();
-        if (y < 1850 || y > max) throw new NumberFormatException("bad year");
-        return y;
-    }
-    private void showInfo(String msg)  { JOptionPane.showMessageDialog(this, msg, "Info", JOptionPane.INFORMATION_MESSAGE);  toast(msg); }
-    private void showError(String msg) { JOptionPane.showMessageDialog(this, msg, "Problem", JOptionPane.ERROR_MESSAGE);       toast("❌ " + msg); }
-    private boolean confirm(String msg) {
-        return JOptionPane.showConfirmDialog(this, msg, "Confirm", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
-    }
-    private void toast(String msg) {
-        if (txtLog == null) return;
-        txtLog.append(msg + "\n");
-        txtLog.setCaretPosition(txtLog.getDocument().getLength());
+    private void onTeamSelected(ListSelectionEvent e) {
+        if (e.getValueIsAdjusting()) return;
+        int row = tblTeams.getSelectedRow();
+        if (row < 0) { playerModel.setRowCount(0); return; }
+        int teamId = (int) teamModel.getValueAt(row, 0);
+        refreshPlayersTable(teamId);
     }
 
-    // ---------------- DELETE & EDIT ----------------
-    private void deleteTeamAtRow(int row) {
-        if (row < 0 || row >= teamModel.getRowCount()) return;
-        int id = (int) teamModel.getValueAt(row, 0);
-        String name = String.valueOf(teamModel.getValueAt(row, 1));
-        if (!confirm("Delete team '" + name + "'?\n(Players & coaches will also be deleted)")) return;
-
-        teamDAO.deleteTeamByIdCascade(id);
-        teamModel.removeRow(row);
-        tblTeams.clearSelection();
-        showInfo("Deleted team: " + name);
-        new Timer(200, e -> loadAllDataAsync()).start();
+    private void refreshPlayersTable(int teamId) {
+        playerModel.setRowCount(0);
+        List<Player> players = playersByTeam.getOrDefault(teamId, List.of());
+        for (Player p : players)
+            playerModel.addRow(new Object[]{p.getIdBoxed(), p.getName(), p.getPosition(), p.getAge(), p.getTeamId(), "Delete"});
     }
 
-    private void deletePlayerAtRow(int row) {
-        if (row < 0 || row >= playerModel.getRowCount()) return;
-        String name = String.valueOf(playerModel.getValueAt(row, 1));
-        if (!confirm("Delete player '" + name + "'?")) return;
-
-        playerDAO.deletePlayerByName(name);
-        playerModel.removeRow(row);
-        tblPlayers.clearSelection();
-        showInfo("Deleted player: " + name);
-        new Timer(200, e -> loadAllDataAsync()).start();
-    }
-
-    private void deleteCoachAtRow(int row) {
-        if (row < 0 || row >= coachModel.getRowCount()) return;
-        String name = String.valueOf(coachModel.getValueAt(row, 1));
-        if (!confirm("Delete coach '" + name + "'?")) return;
-
-        coachDAO.deleteCoachByName(name);
-        coachModel.removeRow(row);
-        tblCoaches.clearSelection();
-        showInfo("Deleted coach: " + name);
-        new Timer(200, e -> loadAllDataAsync()).start();
-    }
-
-    private void editTeamAtRow(int row) {
-        int id = (int) teamModel.getValueAt(row, 0);
-        String name = String.valueOf(teamModel.getValueAt(row, 1));
-        String city = String.valueOf(teamModel.getValueAt(row, 2));
-        String yearStr = String.valueOf(teamModel.getValueAt(row, 3));
-
-        JTextField txtName = new JTextField(name);
-        JTextField txtCity = new JTextField(city);
-        JTextField txtYear = new JTextField(yearStr);
-        Object[] fields = {"Name:", txtName, "City:", txtCity, "Founded:", txtYear};
-
-        if (JOptionPane.showConfirmDialog(this, fields, "Edit Team", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            try {
-                String newName = txtName.getText().trim();
-                String newCity = txtCity.getText().trim();
-                int newYear   = parseYear(txtYear.getText());
-                if (newName.isEmpty() || newCity.isEmpty()) { showError("Name and city are required."); return; }
-                teamDAO.updateTeam(id, newName, newCity, newYear);
-                loadAllDataAsync();
-                showInfo("Team updated.");
-            } catch (NumberFormatException nfe) {
-                showError("Founded year is invalid.");
-            } catch (Exception ex) {
-                showError("Update failed: " + ex.getMessage());
+    private void loadAllDataAsync() {
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() {
+                teams = teamDAO.getAllTeams();
+                playersByTeam.clear();
+                for (Team t : teamDAO.getAllTeamsWithPlayers())
+                    playersByTeam.put(t.id(), t.getPlayers());
+                coaches = coachDAO.getAllCoaches();
+                return null;
             }
-        }
+            @Override protected void done() { populateTables(); }
+        }.execute();
     }
 
-    private void editPlayerAtRow(int row) {
-        Integer id = (Integer) playerModel.getValueAt(row, 0);
-        String name = String.valueOf(playerModel.getValueAt(row, 1));
-        Position pos = (Position) playerModel.getValueAt(row, 2);
-        String ageStr = String.valueOf(playerModel.getValueAt(row, 3));
-        Integer teamId = (Integer) playerModel.getValueAt(row, 4);
-
-        JTextField txtName = new JTextField(name);
-        JComboBox<Position> cmbPos = new JComboBox<>(Position.values());
-        cmbPos.setSelectedItem(pos);
-        JTextField txtAge = new JTextField(ageStr);
-        Object[] fields = {"Name:", txtName, "Position:", cmbPos, "Age:", txtAge};
-
-        if (JOptionPane.showConfirmDialog(this, fields, "Edit Player", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            try {
-                String newName = txtName.getText().trim();
-                int newAge     = parseAge(txtAge.getText());
-                Position newPos = (Position) cmbPos.getSelectedItem();
-                if (newName.isEmpty()) { showError("Player name is required."); return; }
-                playerDAO.updatePlayer(new Player(id, newName, newPos, newAge, teamId));
-                loadAllDataAsync();
-                showInfo("Player updated.");
-            } catch (NumberFormatException nfe) {
-                showError("Age is invalid.");
-            } catch (Exception ex) {
-                showError("Update failed: " + ex.getMessage());
-            }
-        }
+    private void populateTables() {
+        teamModel.setRowCount(0);
+        for (Team t : teams)
+            teamModel.addRow(new Object[]{t.id(), t.getName(), t.getCity(), t.getFoundedYear(), "Delete"});
+        coachModel.setRowCount(0);
+        for (Coach c : coaches)
+            coachModel.addRow(new Object[]{c.id(), c.getName(), c.getAge(), c.getTeamId(), "Delete"});
     }
 
-    private void editCoachAtRow(int row) {
-        Integer id = (Integer) coachModel.getValueAt(row, 0);
-        String name = String.valueOf(coachModel.getValueAt(row, 1));
-        String ageStr = String.valueOf(coachModel.getValueAt(row, 2));
-        Integer teamId = (Integer) coachModel.getValueAt(row, 3);
-
-        JTextField txtName = new JTextField(name);
-        JTextField txtAge  = new JTextField(ageStr);
-        Object[] fields = {"Name:", txtName, "Age:", txtAge};
-
-        if (JOptionPane.showConfirmDialog(this, fields, "Edit Coach", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            try {
-                String newName = txtName.getText().trim();
-                int newAge     = parseAge(txtAge.getText());
-                if (newName.isEmpty()) { showError("Coach name is required."); return; }
-                coachDAO.updateCoach(new Coach(id, newName, newAge, teamId));
-                loadAllDataAsync();
-                showInfo("Coach updated.");
-            } catch (NumberFormatException nfe) {
-                showError("Age is invalid.");
-            } catch (Exception ex) {
-                showError("Update failed: " + ex.getMessage());
-            }
-        }
-    }
-
-    // ---------------- BUTTON COLUMNS ----------------
-    @FunctionalInterface private interface RowColAction { void run(int row, int col); }
-
-    private void addButtonColumns(JTable table, int[] cols, String[] labels, Color[] colors, RowColAction action) {
-        for (int i = 0; i < cols.length; i++) {
-            int colIndex = cols[i];
-            String label = labels[i];
-            Color color  = colors[i];
-
-            table.getColumnModel().getColumn(colIndex).setCellRenderer(new ButtonCellRenderer(label, color));
-            table.getColumnModel().getColumn(colIndex).setCellEditor(new ButtonCellEditor(new JCheckBox(), label, color, action));
-            table.getColumnModel().getColumn(colIndex).setMaxWidth(85);
-        }
-    }
-
-    private static class ButtonCellRenderer extends JButton implements TableCellRenderer {
-        ButtonCellRenderer(String label, Color color) {
-            setOpaque(true); setText(label); setForeground(color); setFont(getFont().deriveFont(Font.BOLD, 12f));
-        }
-        public Component getTableCellRendererComponent(JTable t, Object v, boolean s, boolean f, int r, int c) { return this; }
-    }
-
-    private class ButtonCellEditor extends DefaultCellEditor {
-        private final JButton button;
-        private int currentRow = -1, currentCol = -1;
-        private final RowColAction action;
-
-        ButtonCellEditor(JCheckBox dummy, String label, Color color, RowColAction action) {
-            super(dummy);
-            this.action = action;
-            button = new JButton(label);
-            button.setForeground(color);
-            button.setFont(button.getFont().deriveFont(Font.BOLD, 12f));
-            button.addActionListener(e -> { fireEditingStopped(); SwingUtilities.invokeLater(() -> action.run(currentRow, currentCol)); });
-        }
-        public Component getTableCellEditorComponent(JTable t, Object v, boolean s, int r, int c) {
-            currentRow = r; currentCol = c; return button;
-        }
-        public Object getCellEditorValue() { return null; }
-    }
-
-    // ---------------- MAIN ----------------
     public static void main(String[] args) {
-        // ensure DB schema exists (auto-migration)
         DatabaseMigrator.run();
         SwingUtilities.invokeLater(() -> new FootballGUI().setVisible(true));
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
