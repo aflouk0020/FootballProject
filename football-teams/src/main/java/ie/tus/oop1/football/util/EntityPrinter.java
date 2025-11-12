@@ -9,14 +9,21 @@ import ie.tus.oop1.football.model.*;
 public final class EntityPrinter {
     private EntityPrinter() {}
 
-    public static String describe(FootballEntity e) {
-        if (e instanceof Player p) {
+    public static String describe(FootballEntity e) 
+    {
+        if (e instanceof Player p) 
+        {
             return "Player: " + p.getName() + " | Pos=" + p.getPosition();
-        } else if (e instanceof Team t) {
+        } 
+        else if (e instanceof Team t) 
+        {
             return "Team: " + t.getName() + " from " + t.getCity();
-        } else if (e instanceof Coach c) {
+        } 
+        else if (e instanceof Coach c) 
+        {
             return "Coach: " + c.getName() + " (teamId=" + c.id() + ")";
-        } else {
+        } else 
+        {
             return "Unknown entity: " + e.getClass().getSimpleName();
         }
     }
