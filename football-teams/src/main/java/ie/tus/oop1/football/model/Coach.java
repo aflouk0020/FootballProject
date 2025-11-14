@@ -21,18 +21,26 @@ public final class Coach extends Person implements FootballEntity {
 
 
     @Override
-    public void introduce() {
+    public void introduce() 
+    {
         System.out.println("Coach " + name + ", age " + age + ", teamId=" + teamId);
     }
 
     @Override
-    public int id() { return teamId; }
+    public int id() 
+    { 
+    	return teamId;
+    }
     
-    public int getTeamId() {
+    public int getTeamId() 
+    {
         return teamId;
     }
 
 
     @Override
-    public String name() { return "Coach " + getName(); }
+    public String name() 
+    { 
+    	return "Coach " + getName(); 
+    }
 }

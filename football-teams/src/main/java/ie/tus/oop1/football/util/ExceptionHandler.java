@@ -1,8 +1,8 @@
 package ie.tus.oop1.football.util;
 
 /** Checked exception demo. */
-public class InvalidAgeException extends Exception {
-    public InvalidAgeException(String message) 
+public class ExceptionHandler extends Exception {
+    public ExceptionHandler(String message) 
     { 
     	super(message); 
     }

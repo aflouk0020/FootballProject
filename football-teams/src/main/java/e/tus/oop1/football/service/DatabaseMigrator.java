@@ -37,17 +37,19 @@ public final class DatabaseMigrator {
             """);
 
             // Coaches
+
             s.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS coaches (
                   id INT AUTO_INCREMENT PRIMARY KEY,
                   name VARCHAR(100) NOT NULL,
                   age INT NOT NULL,
-                  team_id INT NOT NULL,
+                  team_id INT NOT NULL UNIQUE,
                   CONSTRAINT fk_coaches_team
                     FOREIGN KEY (team_id) REFERENCES teams(id)
                     ON DELETE CASCADE
                 )
             """);
+
         } catch (Exception e) {
             System.err.println("Schema migration failed: " + e.getMessage());
         }
