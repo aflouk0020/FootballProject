@@ -4,7 +4,7 @@ package ie.tus.oop1.football.model;
  * Abstract base for people in the system.
  * Shows: inheritance, super(), protected fields, abstract method.
  */
-public abstract class Person {
+public abstract sealed class Person permits Player, Coach {
     protected final String name;
     protected final int age;
 

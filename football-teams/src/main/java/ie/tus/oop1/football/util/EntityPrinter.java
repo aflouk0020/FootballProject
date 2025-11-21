@@ -27,4 +27,14 @@ public final class EntityPrinter {
             return "Unknown entity: " + e.getClass().getSimpleName();
         }
     }
+    
+
+//    public static String printModernFormat(FootballEntity e) {
+//        String name = e.name();
+//        int id = e.id();
+//
+//    
+//        return STR."Modern entity: \{name} (#\{id})";
+//    }
+
 }

@@ -69,7 +69,7 @@ public class ValidationUtilTest extends TestCase {
      * Expected: 2000 (No exception)
      * Purpose: Ensure valid year within allowed range is accepted.
      */
-    public void testParseYear001() {
+    public void testParseYear004() {
         try {
             int year = ValidationUtil.parseYear("2000");
             assertEquals(2000, year);
@@ -84,7 +84,7 @@ public class ValidationUtilTest extends TestCase {
      * Expected: ExceptionHandler with message "Invalid year"
      * Purpose: Ensure lower year limit validation works.
      */
-    public void testParseYear002() {
+    public void testParseYear005() {
         try {
             ValidationUtil.parseYear("1800");
             fail("Exception expected");
@@ -99,7 +99,7 @@ public class ValidationUtilTest extends TestCase {
      * Expected: ExceptionHandler with message "Invalid year"
      * Purpose: Ensure year greater than current year is rejected.
      */
-    public void testParseYear003() {
+    public void testParseYear006() {
         try {
             ValidationUtil.parseYear("3000");
             fail("Exception expected");
@@ -107,4 +107,62 @@ public class ValidationUtilTest extends TestCase {
             assertEquals("Invalid year", e.getMessage());
         }
     }
+    // ---------------------------------------------------------
+    // parseAge Additional Tests
+    // ---------------------------------------------------------
+
+
+
+    /**
+     * Test #007: Valid Boundary Age at Lower Limit
+     * Input: "15"
+     * Expected: 15 (No exception)
+     * Purpose: Ensure minimum age boundary is accepted.
+     */
+    public void testParseAge007() {
+        try {
+            int age = ValidationUtil.parseAge("15");
+            assertEquals(15, age);
+        } catch (ExceptionHandler e) {
+            fail("Exception not expected");
+        }
+    }
+
+    /**
+     * Test #008: Valid Boundary Age at Upper Limit
+     * Input: "75"
+     * Expected: 75 (No exception)
+     * Purpose: Ensure maximum age boundary is accepted.
+     */
+    public void testParseAge008() {
+        try {
+            int age = ValidationUtil.parseAge("75");
+            assertEquals(75, age);
+        } catch (ExceptionHandler e) {
+            fail("Exception not expected");
+        }
+    }
+
+
+    // ---------------------------------------------------------
+    // parseYear Additional Tests
+    // ---------------------------------------------------------
+
+
+
+    /**
+     * Test #009: Valid Year at Lower Boundary
+     * Input: "1900" (Assuming 1900 is allowed lower limit)
+     * Expected: 1900 (No exception)
+     * Purpose: Boundary test for lowest valid year.
+     */
+    public void testParseYear009() {
+        try {
+            int year = ValidationUtil.parseYear("1900");
+            assertEquals(1900, year);
+        } catch (ExceptionHandler e) {
+            fail("Exception not expected");
+        }
+    }
+
 }

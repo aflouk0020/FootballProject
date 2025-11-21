@@ -31,6 +31,21 @@ public final class Team implements FootballEntity {
     public int getFoundedYear() { return foundedYear; }
     public List<Player> getPlayers() { return players; }
     
+    
+    public String detailedDescription() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Team: ").append(name)
+          .append(" from ").append(city)
+          .append(" (Founded ").append(foundedYear).append(")\n");
+        
+        sb.append("Players:\n");
+        for (Player p : players) {
+            sb.append(" - ").append(p.getName()).append(" (")
+              .append(p.getPosition().shortCode()).append(")\n");
+        }
+        return sb.toString();
+    }
+
   public void addPlayers(Player... many) 
   {
       if (many != null) 

@@ -8,7 +8,9 @@ public sealed interface FootballEntity permits Team, Player, Coach {
 
     int id();
     String name();
-
+    private static String format(String type, String name, int id) {
+        return type + ": " + name + " [ID=" + id + "]";
+    }
     default String entityInfo() {
         return "Entity: " + name() + " [#" + id() + "]";
     }
