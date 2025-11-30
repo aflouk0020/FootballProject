@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 /** Lambdas & method references helpers. */
 
 public final class ValidationUtil
+
 {
     private ValidationUtil() {}
 
@@ -20,6 +21,7 @@ public final class ValidationUtil
     { 
     	return p.getAge() >= 18;
     }
+    
     
     public static int parseAge(String s) throws ExceptionHandler 
     {

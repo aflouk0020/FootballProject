@@ -18,6 +18,7 @@ public class PlayerDAO {
         }
     }
 
+    
     public boolean addPlayer(Player p) {
         final String sql = "INSERT INTO players(name, position, age, team_id) VALUES(?, ?, ?, ?)";
         try (Connection c = DatabaseConnection.get()) {
@@ -27,6 +28,7 @@ public class PlayerDAO {
                 ps.setInt(3, p.getAge()); ps.setInt(4, p.getTeamId()); ps.executeUpdate();
             }
             return true;
+            
         } catch (SQLException e) { throw new DataAccessRuntimeException("Insert player failed", e); }
     }
 

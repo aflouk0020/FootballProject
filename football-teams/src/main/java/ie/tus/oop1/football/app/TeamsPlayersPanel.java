@@ -23,6 +23,7 @@ import java.util.function.IntConsumer;
 
 public class TeamsPlayersPanel extends JPanel {
 
+	
     private final TeamDAO teamDAO;
     private final PlayerDAO playerDAO;
     private final Runnable dataReloadCallback;

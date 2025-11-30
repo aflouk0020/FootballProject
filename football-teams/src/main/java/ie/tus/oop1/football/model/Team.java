@@ -9,7 +9,8 @@ public final class Team implements FootballEntity {
     private final String city;
     private final int foundedYear;
     private final List<Player> players;
-    private Coach coach; // 🔹 NEW: 1-to-1 relationship
+    private Coach coach; 	
+    
 
     public Team(int id, String name, String city, int foundedYear) {
         this.id = id;

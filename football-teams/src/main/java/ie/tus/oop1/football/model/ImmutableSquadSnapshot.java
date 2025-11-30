@@ -9,13 +9,16 @@ import java.util.List;
  */
 public final class ImmutableSquadSnapshot {
     private final String teamName;
-    private final List<String> playerNames; // immutable snapshot
+    private final List<String> playerNames; // immu§table snapshot
 
     public ImmutableSquadSnapshot(String teamName, List<String> names) {
         this.teamName = teamName;
         this.playerNames = Collections.unmodifiableList(new ArrayList<>(names));
+        
     }
 
+    
+    
     public String teamName() { return teamName; }
     public List<String> playerNames() { return playerNames; }
 }

@@ -13,6 +13,8 @@ public class CoachDAO {
     private static final Logger LOGGER = Logger.getLogger(CoachDAO.class.getName());
 
     // ------------------ ADD ------------------
+    
+    
     public void addCoach(Coach coach) {
         try (Connection conn = DatabaseConnection.get()) {
 

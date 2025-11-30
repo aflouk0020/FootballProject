@@ -3,12 +3,15 @@ package ie.tus.oop1.football.util;
 import ie.tus.oop1.football.model.*;
 
 /**
- * Works on Java 17+ (no preview features required).
+ * Works on Java 17+ .
  * Uses instanceof pattern matching instead of switch expressions.
  */
 public final class EntityPrinter {
     private EntityPrinter() {}
 
+    
+    
+    
     public static String describe(FootballEntity e) 
     {
         if (e instanceof Player p) 

@@ -1,20 +1,25 @@
 @startuml
-title Football Management System - UML Diagram
+title Football Management System – Complete & Accurate UML
 skinparam classAttributeIconSize 0
 skinparam linetype ortho
 skinparam shadowing false
 skinparam backgroundColor #f9f9f9
-skinparam classFontColor #2E4053
-skinparam classBorderColor #5D6D7E
+skinparam classFontColor #1E2A38
+skinparam classBorderColor #47525E
 skinparam classBackgroundColor #E8F6F3
 skinparam ArrowColor #2E86C1
+skinparam packageStyle rectangle
 
+
+' =====================================================
+' MODEL PACKAGE
+' =====================================================
 package "model" {
+
     interface FootballEntity {
-        + int id()
-        + String name()
-        + default String entityInfo()
-        + static void printType(FootballEntity)
+        + id(): int
+        + name(): String
+        + entityInfo(): String
     }
 
     abstract class Person {
@@ -22,7 +27,7 @@ package "model" {
         - age: int
         + getName(): String
         + getAge(): int
-        + abstract void introduce()
+        + introduce(): void
     }
 
     class Team implements FootballEntity {
@@ -31,22 +36,29 @@ package "model" {
         - city: String
         - foundedYear: int
         - players: List<Player>
-        + addPlayer(Player)
-        + addPlayers(Player... many)
+        + Team(int, String, String, int)
+        + Team(String, String, int)
+        + addPlayer(Player): void
+        + addPlayers(Player... many): void
         + getPlayers(): List<Player>
+        + toString(): String
     }
 
     class Player extends Person implements FootballEntity {
         - id: Integer
         - position: Position
         - teamId: int
+        + Player(int, String, int, Position, int)
+        + Player(String, int, Position, int)
         + getPosition(): Position
         + getTeamId(): int
         + introduce(): void
     }
 
     class Coach extends Person implements FootballEntity {
+        - id: Integer
         - teamId: int
+        + Coach(int, String, int, int)
         + introduce(): void
     }
 
@@ -55,11 +67,8 @@ package "model" {
         DEFENDER
         MIDFIELDER
         FORWARD
-        + description(): String
-        + shortCode(): String
     }
 
-    ' using stereotype instead of record keyword for compatibility
     class ContractRecord <<record>> {
         playerName: String
         annualSalary: double
@@ -69,66 +78,183 @@ package "model" {
     class ImmutableSquadSnapshot {
         - teamName: String
         - playerNames: List<String>
+        + ImmutableSquadSnapshot(String, List<String>)
+        + getTeamName(): String
+        + getPlayerNames(): List<String>
     }
 }
 
+' =====================================================
+' DAO PACKAGE
+' =====================================================
 package "dao" {
+
     class DatabaseConnection {
-        + static Connection get()
+        + get(): Connection
+    }
+
+    class DatabaseMigrator {
+        + DatabaseMigrator()
+        + migrate(): void
     }
 
     class TeamDAO {
-        + int addTeamAndReturnId(Team)
-        + List<Team> getAllTeamsWithPlayers()
+        + addTeamAndReturnId(Team): int
+        + getAllTeamsWithPlayers(): List<Team>
+        + updateTeam(Team): boolean
+        + deleteTeam(int): boolean
     }
 
     class PlayerDAO {
-        + boolean addPlayer(Player)
-        + List<Player> getAllPlayers()
+        + addPlayer(Player): boolean
+        + getAllPlayers(): List<Player>
+        + updatePlayer(Player): boolean
+        + deletePlayer(int): boolean
     }
 
     class CoachDAO {
-        + boolean addCoach(Coach)
-        + List<Coach> getAllCoaches()
+        + addCoach(Coach): boolean
+        + getAllCoaches(): List<Coach>
+        + updateCoach(Coach): boolean
+        + deleteCoach(int): boolean
     }
 }
 
+' =====================================================
+' SERVICE PACKAGE
+' =====================================================
+package "service" {
+
+    class LeagueService {
+        + LeagueService(TeamDAO, PlayerDAO, CoachDAO)
+        + simulateLeague(): List<Map<String,Object>>
+        + generateLeagueTable(): List<Map<String,Object>>
+        + exportJson(String): void
+        + exportXml(String): void
+        + getAllTeamsSorted(): List<Team>
+    }
+}
+
+' =====================================================
+' UTIL PACKAGE
+' =====================================================
 package "util" {
-    class InvalidAgeException
-    class DataAccessRuntimeException
-    class ValidationUtil {
-        + static List<Player> filter(List<Player>, Predicate<Player>)
-        + static boolean isAdult(Player)
+
+    class ExceptionHandler {
+        + ExceptionHandler(String)
     }
+
+    class InvalidAgeException
+
+    class DataAccessRuntimeException
+
+    class ValidationUtil {
+        + filter(List<Player>, Predicate<Player>): List<Player>
+        + isAdult(Player): boolean
+        + parseAge(String): int
+        + parseYear(String): int
+    }
+
     class EntityPrinter {
-        + static String describe(FootballEntity)
+        + describe(FootballEntity): String
     }
 }
 
+' =====================================================
+' GUI PACKAGE
+' =====================================================
+package "gui" {
+
+    class FootballGUI {
+        + FootballGUI()
+        + loadAllDataAsync(): void
+    }
+
+    class TeamsPlayersPanel {
+        + TeamsPlayersPanel(TeamDAO, PlayerDAO)
+        + refreshTeams(): void
+        + refreshPlayers(): void
+        + loadPlayersForSelectedTeam(): void
+    }
+
+    class CoachesPanel {
+        + CoachesPanel(CoachDAO, TeamDAO)
+        + refreshCoaches(): void
+        + loadCoachForSelectedTeam(): void
+    }
+
+    class LeaguePanel {
+        + LeaguePanel(LeagueService)
+        + simulate(): void
+        + exportJson(): void
+        + exportXml(): void
+        + refreshTable(): void
+        + showSummaryChart(): void
+    }
+
+    class ButtonRenderer
+}
+
+' =====================================================
+' APP PACKAGE
+' =====================================================
 package "app" {
     class Main {
-        + static void main(String[] args)
+        + main(String[]): void
     }
 }
 
-' ==============================
-' Relationships
-' ==============================
+' =====================================================
+' RELATIONSHIPS (ACCURATE TO REAL CODE)
+' =====================================================
+
+' MODEL INHERITANCE
 FootballEntity <|-- Team
 FootballEntity <|-- Player
 FootballEntity <|-- Coach
 Person <|-- Player
 Person <|-- Coach
+
+' ASSOCIATIONS
 Team "1" o-- "*" Player
 Team "1" o-- "1" Coach
+
+' DAO DEPENDENCIES
+DatabaseMigrator --> DatabaseConnection
+TeamDAO --> DatabaseConnection
+PlayerDAO --> DatabaseConnection
+CoachDAO --> DatabaseConnection
 TeamDAO --> Team
 PlayerDAO --> Player
 CoachDAO --> Coach
+
+' SERVICE DEPENDENCIES
+LeagueService --> TeamDAO
+LeagueService --> PlayerDAO
+LeagueService --> CoachDAO
+
+' UTIL DEPENDENCIES
 ValidationUtil --> Player
 EntityPrinter --> FootballEntity
-Main --> TeamDAO
-Main --> PlayerDAO
-Main --> CoachDAO
-Main --> FootballEntity
+ExceptionHandler --> ValidationUtil
+
+' GUI DEPENDENCIES
+FootballGUI --> TeamsPlayersPanel
+FootballGUI --> CoachesPanel
+FootballGUI --> LeaguePanel
+
+TeamsPlayersPanel --> TeamDAO
+TeamsPlayersPanel --> PlayerDAO
+
+CoachesPanel --> CoachDAO
+CoachesPanel --> TeamDAO
+
+LeaguePanel --> LeagueService
+
+ButtonRenderer --> FootballGUI
+
+' APP ENTRYPOINT
+Main --> FootballGUI
+Main --> DatabaseMigrator
 
 @enduml

@@ -10,3 +10,5 @@ public record ContractRecord(String playerName, double annualSalary, int years) 
     }
     public double totalValue() { return annualSalary * years; }
 }
+
+

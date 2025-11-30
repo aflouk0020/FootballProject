@@ -24,6 +24,7 @@ public class CoachesPanel extends JPanel {
     private final CoachDAO coachDAO;
     private final Runnable dataReloadCallback;
 
+    
     private JTable tblCoaches;
     private DefaultTableModel coachModel;
 
@@ -42,6 +43,7 @@ public class CoachesPanel extends JPanel {
         buildUI();
     }
 
+    
     private void buildUI() {
         coachModel = new DefaultTableModel(new Object[]{"ID", "Name", "Age", "Team ID", "Delete"}, 0) {
             @Override
@@ -84,11 +86,11 @@ public class CoachesPanel extends JPanel {
                         }
 
                         super.setValueAt(aValue, row, column);
-                        showInfo("✅ Coach updated successfully.");
+                        showInfo("Coach updated successfully.");
                         dataReloadCallback.run();
 
                     } catch (Exception ex) {
-                        showError("❌ " + ex.getMessage());
+                        showError(ex.getMessage());
                         SwingUtilities.invokeLater(() -> super.setValueAt(oldValue, row, column));
                         dataReloadCallback.run();
                     }
@@ -182,13 +184,13 @@ public class CoachesPanel extends JPanel {
                 // 🔹 1-to-1 relationship validation
                 for (Coach c : coaches) {
                     if (c.getTeamId() == t.id()) {
-                        showError("❌ This team already has a coach assigned.");
+                        showError("This team already has a coach assigned.");
                         return;
                     }
                 }
 
                 coachDAO.addCoach(new Coach(name, age, t.id()));
-                showInfo("✅ Coach added successfully.");
+                showInfo("Coach added successfully.");
                 dataReloadCallback.run();
 
             } catch (Exception ex) {

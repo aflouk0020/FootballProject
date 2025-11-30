@@ -12,7 +12,9 @@ public final class DatabaseConnection {
 
     private DatabaseConnection() {}
 
+    
     public static Connection get() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASS);
+        
     }
 }

@@ -8,10 +8,12 @@ public final class Coach extends Person implements FootballEntity {
     private final int teamId;
     private int id;
     
+    
 
     public Coach(String name, int age, int teamId) {
         super(name, age);
         this.teamId = teamId;
+        
     }
     public Coach(int id, String name, int age, int teamId) {
         super(name, age);

@@ -19,4 +19,6 @@ public sealed interface FootballEntity permits Team, Player, Coach {
     static void printType(FootballEntity e) {
         System.out.println("Entity type: " + e.getClass().getSimpleName());
     }
+    
 }
+

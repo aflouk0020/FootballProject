@@ -4,27 +4,28 @@ import ie.tus.oop1.football.util.ExceptionHandler;
 
 /**
  * Player extends Person and implements FootballEntity.
- * Mostly immutable, except id assigned by DB. Demonstrates checked exception in factory.
  */
 public final class Player extends Person implements FootballEntity {
     private Integer id;               // DB id (nullable until inserted)
     private final Position position;
     private final int teamId;         
 
-    // main constructor used by your existing code
+
     public Player(String name, Position position, int age, int teamId) {
         super(name, age);
         this.position = position;
         this.teamId = teamId;
+        
     }
 
-    // optional: construct with id (e.g., reading from DB)
+    
+    
     public Player(Integer id, String name, Position position, int age, int teamId) {
         this(name, position, age, teamId);
         this.id = id;
     }
 
-    // Factory with validation (checked exception)
+
     public static Player createValidated(String name, Position position, int age, int teamId) throws ExceptionHandler 
     {
         if (age < 16) throw new ExceptionHandler("Player too young: " + age);

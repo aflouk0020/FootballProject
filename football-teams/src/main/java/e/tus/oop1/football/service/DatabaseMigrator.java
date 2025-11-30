@@ -10,6 +10,7 @@ import java.sql.Statement;
 public final class DatabaseMigrator {
     private DatabaseMigrator() {}
 
+    
     public static void run() {
         try (Connection c = DatabaseConnection.get(); Statement s = c.createStatement()) {
             // Teams
