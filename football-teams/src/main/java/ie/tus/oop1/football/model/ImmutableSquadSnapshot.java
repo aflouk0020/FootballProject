@@ -14,10 +14,7 @@ public final class ImmutableSquadSnapshot {
     public ImmutableSquadSnapshot(String teamName, List<String> names) {
         this.teamName = teamName;
         this.playerNames = Collections.unmodifiableList(new ArrayList<>(names));
-        
     }
-
-    
     
     public String teamName() { return teamName; }
     public List<String> playerNames() { return playerNames; }

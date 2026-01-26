@@ -3,6 +3,7 @@ package ie.tus.oop1.football.model;
 /**
  * Enum with behaviour: description + category flag.
  */
+
 public enum Position {
 	
     GOALKEEPER("Responsible for saving goals", false),
